@@ -10,6 +10,7 @@ import { useChatHistory } from '~/lib/persistence';
 import { createCommandsMessage, detectProjectCommands } from '~/utils/projectCommands';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
 import { toast } from 'react-toastify';
+import Cookies from 'js-cookie';
 
 const IGNORE_PATTERNS = [
   'node_modules/**',
@@ -35,6 +36,22 @@ const IGNORE_PATTERNS = [
   '**/*lock.yaml',
 ];
 
+const formatGitHubUrl = (url: string, token: string) => {
+  if (!url.includes('github.com')) {
+    return url;
+  }
+
+  const httpsUrl = url.replace('git@github.com:', 'https://github.com/');
+
+  if (!token) {
+    return httpsUrl;
+  }
+
+  const urlObj = new URL(httpsUrl);
+
+  return `https://x-access-token:${token}@${urlObj.host}${urlObj.pathname}`;
+};
+
 export function GitUrlImport() {
   const [searchParams] = useSearchParams();
   const { ready: historyReady, importChat } = useChatHistory();
@@ -51,7 +68,10 @@ export function GitUrlImport() {
       const ig = ignore().add(IGNORE_PATTERNS);
 
       try {
-        const { workdir, data } = await gitClone(repoUrl);
+        const githubToken = Cookies.get('githubToken');
+        const cloneUrl = formatGitHubUrl(repoUrl, githubToken || '');
+
+        const { workdir, data } = await gitClone(cloneUrl);
 
         if (importChat) {
           const filePaths = Object.keys(data).filter((filePath) => !ig.ignores(filePath));
@@ -96,9 +116,14 @@ ${file.content}
 
           await importChat(`Git Project:${repoUrl.split('/').slice(-1)[0]}`, messages);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error during import:', error);
-        toast.error('Failed to import repository');
+
+        const errorMessage =
+          error instanceof Error && error.message?.includes('403')
+            ? 'Failed to import repository. Please ensure your GitHub token has access to this repository. For organization repositories, you need to explicitly grant access in your token settings.'
+            : 'Failed to import repository';
+        toast.error(errorMessage);
         setLoading(false);
         window.location.href = '/';
 

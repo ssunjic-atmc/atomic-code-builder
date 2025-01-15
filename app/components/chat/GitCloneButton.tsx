@@ -6,6 +6,7 @@ import { generateId } from '~/utils/fileUtils';
 import { useState } from 'react';
 import { toast } from 'react-toastify';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
+import Cookies from 'js-cookie';
 
 const IGNORE_PATTERNS = [
   'node_modules/**',
@@ -38,6 +39,22 @@ interface GitCloneButtonProps {
   importChat?: (description: string, messages: Message[]) => Promise<void>;
 }
 
+const formatGitHubUrl = (url: string, token: string) => {
+  if (!url.includes('github.com')) {
+    return url;
+  }
+
+  const httpsUrl = url.replace('git@github.com:', 'https://github.com/');
+
+  if (!token) {
+    return httpsUrl;
+  }
+
+  const urlObj = new URL(httpsUrl);
+
+  return `https://${token}@${urlObj.host}${urlObj.pathname}`;
+};
+
 export default function GitCloneButton({ importChat }: GitCloneButtonProps) {
   const { ready, gitClone } = useGit();
   const [loading, setLoading] = useState(false);
@@ -53,7 +70,10 @@ export default function GitCloneButton({ importChat }: GitCloneButtonProps) {
       setLoading(true);
 
       try {
-        const { workdir, data } = await gitClone(repoUrl);
+        const githubToken = Cookies.get('githubToken');
+        const cloneUrl = formatGitHubUrl(repoUrl, githubToken || '');
+
+        const { workdir, data } = await gitClone(cloneUrl);
 
         if (importChat) {
           const filePaths = Object.keys(data).filter((filePath) => !ig.ignores(filePath));
@@ -100,9 +120,14 @@ ${file.content}
 
           await importChat(`Git Project:${repoUrl.split('/').slice(-1)[0]}`, messages);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error during import:', error);
-        toast.error('Failed to import repository');
+
+        const errorMessage =
+          error instanceof Error && error.message?.includes('403')
+            ? 'Failed to import repository. If this is a private repository, please ensure you are connected to GitHub in Settings.'
+            : 'Failed to import repository';
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }

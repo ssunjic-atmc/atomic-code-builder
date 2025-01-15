@@ -40,7 +40,7 @@ const BASE_COLORS = {
     200: '#E1D6FF',
     300: '#CEBEFF',
     400: '#B69EFF',
-    500: '#9C7DFF',
+    500: '#0b81be',
     600: '#8A5FFF',
     700: '#7645E8',
     800: '#6234BB',
@@ -99,7 +99,7 @@ const COLOR_PRIMITIVES = {
 
 export default defineConfig({
   safelist: [
-    ...Object.keys(customIconCollection[collectionName]||{}).map(x=>`i-bolt:${x}`)    
+    ...Object.keys(customIconCollection[collectionName]||{}).map(x=>`i-bolt:${x}`)
   ],
   shortcuts: {
     'bolt-ease-cubic-bezier': 'ease-[cubic-bezier(0.4,0,0.2,1)]',
